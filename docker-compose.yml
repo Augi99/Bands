@@ -1,0 +1,23 @@
+version: "3"
+services:
+    songs-service:
+        build: ./Songs-service
+        networks: 
+            - bandnet
+        ports:
+            - 5000:5000 
+    bands:
+        build: ./bands
+        ports:
+            - 80:80
+        networks: 
+            - bandnet
+        depends_on:
+            - songs-service
+
+
+networks:
+    bandnet:
+        driver: bridge
+        ipam: 
+            driver: default
