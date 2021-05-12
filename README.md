@@ -9,11 +9,16 @@
 
 ### Get
 
-URL: http://localhost:80/bands
+URL: 
+http://localhost:80/bands
+
+URL: 
+http://localhost:80/bands/1
 
 ### POST
 
-URL: http://localhost:80/bands
+URL: 
+http://localhost:80/bands
 
 {
     "name" : "Powerwolf",
@@ -23,7 +28,8 @@ URL: http://localhost:80/bands
 
 ### PUT
 
-URL : http://localhost:80/bands/3
+URL : 
+http://localhost:80/bands/3
 
 {
     "name" : "Nightwish",
@@ -33,4 +39,5 @@ URL : http://localhost:80/bands/3
 
 ### DELETE
 
-URL: http://localhost:80/bands/7
+URL: 
+http://localhost:80/bands/7
