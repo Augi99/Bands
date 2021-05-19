@@ -8,7 +8,8 @@ class Validator{
             id : Joi.number().integer().min(1).required(),
             name : Joi.string().required(),
             genre : Joi.string().required(),
-            nationality : Joi.string().required()
+            nationality : Joi.string().required(),
+            songIds : Joi.array()
         };
     }
 

@@ -9,6 +9,7 @@ RUN npm i express
 RUN npm i joi@13.1.0
 RUN npm i mongoose
 RUN npm i http
+RUN npm i axios
 
 EXPOSE 80
 

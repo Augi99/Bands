@@ -4,38 +4,35 @@ const router = express.Router();
 const BandModule = require('./Band');
 const Band = BandModule.Band;
 
+const axios = require('axios');
+
 const va = require('./Validator');
 
-//const request = require('request');
 const http = require('http');
-const { abort } = require('process');
-http.set
+
+//const { try } = require('joi/lib/types/alternatives');
 
 const Validator = va.validator;
 const validator = new Validator();
 
+
 router.get('/', (req, res) =>
 {
-    
     Band.find()
     .then(result => 
     {
-        getAllSongs((songs) => 
+        if(result.length > 0)
         {
-            //console.log("songs: " + songs);
-            if(result.length > 0)
-            {
-                res.send(prepareResponseArray(result, songs));
-            }else
-            {
-                res.status(404);
-                res.send("No bands found");
-            }
-        });
+            prepareResponseArray(result, res);
+        }else
+        {
+            res.status(404);
+            res.send("No bands found");
+        }
     })
     .catch(error =>
     {
-        //console.log(error);
+        console.log(error);
         res.status(404);
         res.send("Error occurred");
     });
@@ -51,12 +48,7 @@ router.get('/:id', (req, res) =>
             res.status(404);
             res.send("Not found");
             return;
-        }
-
-        getAllSongs((songs) =>
-        {
-            res.send(prepareResponse(result, songs));
-        });
+        }else prepareResponse(result, res);
         
     })
     .catch(error =>
@@ -104,13 +96,8 @@ router.put('/:id', (req, res) =>
     {
         if(result)
         {
-            getAllSongs((songs) => 
-            {
-                res.status(200);
-                res.location("http:/localhost:5000/bands/" + result.id);
-                //console.log(songs);
-                res.send(prepareResponse(updatedBand, songs));
-            });
+
+            prepareResponse(updatedBand, res);
             
         }else
         {
@@ -128,11 +115,7 @@ router.delete('/:id', (req, res) => {
     {
         if(result)
         {
-            getAllSongs((songs) => 
-            {
-                res.status(200);
-                res.send(prepareResponse(result, songs));
-            });
+            prepareResponse(result, res);
             
             
         }else
@@ -144,29 +127,26 @@ router.delete('/:id', (req, res) => {
 
 });
 
-function prepareResponse(result, songs)
+async function prepareResponse(result, res)
 {
     let response = result.toJSON();
     delete response._id;
     delete response.__v;
-    let theirSongs = songs.filter(song => song.artist === response.name);
-    if(songs[0] != 'Error')
+
+    let songs =  await gatherSongs(response.songIds);
+    for(let i = 0; i < response.songIds.length; i++)
     {
-        if(theirSongs.length != 0)
-        {
-            for(let j = 0; j < theirSongs.length; j++)
-            {
-                //console.log(theirSongs[0]);
-                delete theirSongs[j].id;
-                delete theirSongs[j].artist;
-                delete theirSongs[j].date_created;
-            }
-            response.songs = theirSongs;
-        }else response.songs = "We don't know any of their songs";
-    }else response.songs = "Their song collection is currently unavailable";
+        delete songs[i].id;
+        delete songs[i].artist;
+    }
+    if(songs.length == 0)
+    {
+        response.songs = "We don't know of any of their songs";
+    }else response.songs = songs;
     
-    //console.log(response);
-    return response;
+    delete response.songIds;
+    
+    res.send(response);
 }
 
 
@@ -175,44 +155,40 @@ function prepareBand(result)
     let response = result.toJSON();
     delete response._id;
     delete response.__v;
+    delete response.songIds;
     
     return response;
 }
 
-function prepareResponseArray(result, songs)
+async function prepareResponseArray(result, res)
 {
     let responseArray = [];
     for(let  i = 0; i < result.length; i++)
     {
         let response = result[i].toJSON();
-        //console.log(response);
+        response.songs = [];
+        let songs =  await gatherSongs(response.songIds);
+        for(let i = 0; i < response.songIds.length; i++)
+        {
+            delete songs[i].id;
+            delete songs[i].artist;
+        }
+
+        if(songs.length == 0)
+        {
+            response.songs = "We don't know of any of their songs";
+        }else response.songs = songs;
+
         delete response._id;
         delete response.__v;
-        if(songs[0] != 'Error')
-        {
-            let theirSongs = songs.filter(song => song.artist === response.name); 
-            //console.log(theirSongs.length +  " " +  response.name);
-            if(theirSongs.length != 0)
-            {
-                for(let j = 0; j < theirSongs.length; j++)
-                {
-                    //console.log(theirSongs[0]);
-                    delete theirSongs[j].id;
-                    delete theirSongs[j].artist;
-                    delete theirSongs[j].date_created;
-                }
-                response.songs = theirSongs;
-            }else response.songs = "We don't know any of their songs";
-            
-            
-        }else response.songs = "Their song collection is currently unavailable";
-        
+        delete response.songIds;
         responseArray.push(response);
+
     }
-    return responseArray;
+    res.send(responseArray);
 }
 
-function createBand(identificator, req, res)
+async function createBand(identificator, req, res)
 {
     let newBand = new Band(
     {
@@ -223,8 +199,10 @@ function createBand(identificator, req, res)
     });
 
 
+    let {error} = validator.validateBand(newBand.toJSON());
 
-    const {error} = validator.validateBand(newBand.toJSON());
+    
+
     if(error)
     {
         res.status(400);
@@ -232,19 +210,57 @@ function createBand(identificator, req, res)
         return;
     }
 
-    newBand.save()
-    .then((result) => 
+
+    Band.findOne({name: newBand.name})
+    .then(found => 
     {
-        getAllSongs((songs) =>
+
+        if(found)
         {
-            res.status(201);
-            res.location("http:/localhost:80/bands/" + newBand.id);
-            res.send(prepareResponse(result, songs));
-        });
+            
+            res.status(400);
+            res.send("Such band already exists");
+            return;
+        }else
+        {
+
+            if(req.body.songs)
+            {
+                req.body.songs.artist  = newBand.name;
+                axios.post('http://songs-service:5000/songs', req.body.songs)
+                .then(() => 
+                {
+                    newBand.save()
+                    .then((result) => 
+                    {
+                        updateSongs();
+                        res.location("http:/localhost/bands/" + newBand.id);  
+                        prepareResponse(result, res);
+                    })
+                    .catch((err) => {
+                        updateSongs();
+                        console.log(err);
+                        res.send("Post failed");
+                    });
+                });
+            }
+            
+            
+        
+        
+            
+        }
+        
     })
-    .catch((err) => {
-        res.send("Post failed");
-    });
+    .catch(err => 
+    {
+        res.status(400);
+        res.send(err);
+    })
+
+
+
+
 }
 
 function getAllSongs(callback)
@@ -252,22 +268,22 @@ function getAllSongs(callback)
     let data = '';
     http.get('http://songs-service:5000/songs', {timeout: 3000} ,res => 
     {        
-    res.on('data', res => 
-    {
-        data += res;
-        
-    })
-    res.on('end', () => 
-    {
-        try {
-          const parsedData = JSON.parse(data);
-          //console.log(parsedData);
-          callback(parsedData);
-        } catch (e) {
-          console.error(e.message);
-        }
-      });
-
+        res.on('data', res => 
+        {
+            data += res;
+            
+        })
+        res.on('end', () => 
+        {
+            try 
+            {
+                const parsedData = JSON.parse(data);
+                callback(parsedData);
+            } catch (e) 
+            {
+                console.error(e.message);
+            }
+        });
     })
     .on('error', e => {
     console.error(e);
@@ -275,11 +291,58 @@ function getAllSongs(callback)
     .on('timeout', time => 
     {
         callback(["Error"]);
-        //abort();
     });
 
 }
 
+function updateSongs()
+{
+    getAllSongs((songs) => 
+    {
+        for(let i = 0; i < songs.length; i++)
+        {
+            Band.findOne({name: songs[i].artist}, (err, res) => 
+            {
+                if(res)
+                {
+                    if(!res.songIds.includes(songs[i].id))
+                    {
+                        res.songIds.push(songs[i].id);
+                        res.save();
+                    } 
+                }
+                
+            });
+        }
+    });
+}
+
+
+
+
+
+async function getSong(id)
+{
+    try
+    {
+        let res = await axios.get('http://songs-service:5000/songs/' + JSON.stringify(id), {timeout : 2000});
+        return res.data[0];
+    }catch(err)
+    {
+        return("Info about the song is currently unavailable")
+    }
+}
+
+async function gatherSongs(ids)
+{
+    let results = [];
+    for(let i = 0; i < ids.length; i++)
+    {
+        results[i] =  await getSong(ids[i]);
+    }
+
+    return results;
+}
 
 exports.bandsRoute = router;
 

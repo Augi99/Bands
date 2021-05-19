@@ -5,7 +5,8 @@ const bandSchema = new Schema({
     id: Number,
     name : String,
     genre: String,
-    nationality : String
+    nationality : String,
+    songIds : [Number]
 });
 
 const Band = mongoose.model('Band', bandSchema);
